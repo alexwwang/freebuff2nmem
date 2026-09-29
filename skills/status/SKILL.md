@@ -41,7 +41,7 @@ Shows detected AI tools and their skill connection status:
 
 | Issue | Check | Fix |
 |---|---|---|
-| MCP not connecting | `curl http://<nmem_api_url>/health` | Ensure nmem server is running |
+| MCP not connecting | `curl <nmem_api_url>/health` | Ensure nmem server is running |
 | Skills not loading | `ls ~/.config/manicode/.agents/skills/` | Verify skill directory structure |
 | Sync not working | `knowledge-mem-freebuff-sync --dry-run` | Check chat directory permissions |
 | Trust prompt反复 | Check `FREEBUFF_TRUST_AGENTS` env | Set to `1` to skip confirmation |

@@ -19,7 +19,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SOURCE_APP = "freebuff";
-const DEFAULT_API_URL = "http://<nmem_api_url>";
+const DEFAULT_API_URL = "<nmem_api_url>";
 const CONFIG_PATH = join(homedir(), ".nowledge-mem", "config.json");
 const STATE_FILE = ".sync-state.json";
 const DEFAULT_MAX_MESSAGE_CHARS = 8000;
