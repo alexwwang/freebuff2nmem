@@ -220,6 +220,7 @@ function loadState(projectPath) {
 }
 
 function saveState(projectPath, state) {
+	state.lastSync = new Date().toISOString();
 	writeFileSync(join(projectPath, STATE_FILE), JSON.stringify(state, null, 2) + "\n");
 }
 
