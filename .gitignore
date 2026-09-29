@@ -10,3 +10,4 @@ __pycache__/
 
 # Session data (already synced to nmem)
 sessions/
+.sync-state.json
