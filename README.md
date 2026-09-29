@@ -8,11 +8,11 @@
 
 ### What is it?
 
-**nowledge-mem-freebuff** is an official-style nmem plugin package for **freebuff** (manicode/codebuff). It gives your AI coding sessions access to persistent cross-tool memory—so decisions, bug fixes, and architecture constraints survive between conversations.
+**nowledge-mem-freebuff** is a bridge package that connects your freebuff (manicode/codebuff) sessions with **Nowledge Mem**. It gives your AI coding sessions access to persistent cross-tool memory—so decisions, bug fixes, and architecture constraints survive between conversations.
 
 ### Why does this matter?
 
-freebuff doesn't have a TypeScript Extension API like Pi. This plugin works around that limitation with:
+freebuff doesn't have a TypeScript Extension API like Pi. This package works around that limitation with:
 - **5 standard skills** for in-session memory access
 - **MCP server injection** via `.agents/mcp.json`
 - **CLI sync script** for historical chat import
@@ -137,11 +137,11 @@ knowledge-mem-freebuff-sync --json --project <project_name> --dry-run
 
 ### 这是什么？
 
-**nowledge-mem-freebuff** 是面向 **freebuff**（manicode/codebuff）的 nmem 官方插件包。它让你的 AI 编程会话能够访问跨工具的持久记忆——决策、Bug 修复、架构约束都能在对话间延续。
+**nowledge-mem-freebuff** 是连接 **freebuff**（manicode/codebuff）与 **Nowledge Mem** 的桥接包。它让你的 AI 编程会话能够访问跨工具的持久记忆——决策、Bug 修复、架构约束都能在对话间延续。
 
 ### 为什么重要？
 
-freebuff 不像 Pi 那样有 TypeScript Extension API。本插件通过以下方式弥补这一限制：
+freebuff 不像 Pi 那样有 TypeScript Extension API。本包通过以下方式弥补这一限制：
 - **5 个标准 skill** 用于会话内记忆访问
 - **MCP 服务器注入** 通过 `.agents/mcp.json`
 - **CLI 同步脚本** 用于历史对话导入
