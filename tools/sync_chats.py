@@ -3,27 +3,67 @@
 sync_chats.py - Extract durable memories from manicode chat history.
 
 Usage:
-    python3 sync_chats.py [--project PROJECT_NAME] [--dry-run] [--limit N]
+    # Incremental sync (default) - only process new/updated chats
+    python3 sync_chats.py --project PROJECT_NAME
+    
+    # Full re-sync - process all chats
+    python3 sync_chats.py --project PROJECT_NAME --full
+    
+    # Dry run - show what would be synced
+    python3 sync_chats.py --project PROJECT_NAME --dry-run
 
-This script scans ~/.config/manicode/projects/<project>/chats/*/ directories,
-extracts durable facts from chat-messages.json and run-state.json, and writes
-them to Nowledge Mem via nmem CLI.
+State file: ~/.config/manicode/projects/<project>/.sync-state.json
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
+from datetime import datetime
 
 BASE_DIR = Path.home() / ".config/manicode/projects"
 STUB_THRESHOLD = 10_000  # Skip log.jsonl < 10KB
+SYNC_STATE_FILE = ".sync-state.json"
+
+
+def get_chat_hash(chat_dir: Path) -> str:
+    """Calculate hash of chat directory for change detection."""
+    msgs_file = chat_dir / "chat-messages.json"
+    if not msgs_file.exists():
+        return None
+    
+    # Hash the file content
+    with open(msgs_file, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:16]
+
+
+def load_sync_state(project_path: Path) -> dict:
+    """Load previous sync state."""
+    state_file = project_path / SYNC_STATE_FILE
+    if state_file.exists():
+        try:
+            with open(state_file) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"chats": {}, "last_sync": None}
+
+
+def save_sync_state(project_path: Path, state: dict):
+    """Save sync state."""
+    state_file = project_path / SYNC_STATE_FILE
+    state["last_sync"] = datetime.now().isoformat()
+    with open(state_file, "w") as f:
+        json.dump(state, f, indent=2, ensure_ascii=False)
 
 
 def extract_text_from_blocks(blocks: list) -> str:
-    """Extract readable text from message blocks (AI replies store text here, not at top level)."""
+    """Extract readable text from message blocks."""
     parts = []
     for b in blocks:
         if b.get("type") == "text":
@@ -78,29 +118,18 @@ def extract_durable_facts(chat_dir: Path, ts: str) -> list:
         r"slot.*size|partition.*offset|nvs.*offset",
     ]
 
-    seen_titles = set()
-    for i, txt in enumerate(ai_texts[:5]):  # Top 5 responses per chat
-        if len(txt) < 150:
-            continue
-        is_fact = any(re.search(p, txt) for p in fact_patterns)
-        if not is_fact:
+    for i, txt in enumerate(ai_texts[:5]):
+        if not any(re.search(p, txt) for p in fact_patterns):
             continue
         
         lines = [l.strip() for l in txt.split("\n") if l.strip() and len(l.strip()) > 10]
-        title = lines[0][:80] if lines else f"AI response {i+1} in {ts}"
+        title = lines[0][:80] if lines else f"Fact from {ts}"
         
-        # Avoid duplicate titles
-        title_key = title[:50]
-        if title_key in seen_titles:
-            continue
-        seen_titles.add(title_key)
-        
-        content = txt[:1000].replace("\n", " ")
         facts.append({
             "timestamp": ts,
             "title": title,
-            "content": content,
-            "chat_dir": str(chat_dir),
+            "content": txt[:1000],
+            "source": str(chat_dir),
         })
 
     # Extract run-state final status
@@ -109,6 +138,7 @@ def extract_durable_facts(chat_dir: Path, ts: str) -> list:
             with open(runstate_file) as f:
                 rs = json.load(f)
             output = rs.get("output", {})
+            
             if output.get("type") == "lastMessage":
                 for m in output.get("value", []):
                     if isinstance(m, dict):
@@ -118,17 +148,17 @@ def extract_durable_facts(chat_dir: Path, ts: str) -> list:
                                 if txt and len(txt) > 100:
                                     facts.append({
                                         "timestamp": ts + "_runstate",
-                                        "title": f"[runstate] {txt[:50]}",
+                                        "title": f"[交付物] {txt[:50]}",
                                         "content": txt[:800],
-                                        "chat_dir": str(chat_dir),
-                                        "is_runstate": True,
+                                        "source": str(chat_dir),
+                                        "is_delivery": True,
                                     })
             elif output.get("type") == "error":
                 facts.append({
                     "timestamp": ts + "_interrupted",
                     "title": "[中断标记] 会话以错误结束，有未完成进度",
                     "content": f"session ended with error, trace={rs.get('traceSessionId','')}",
-                    "chat_dir": str(chat_dir),
+                    "source": str(chat_dir),
                     "is_interrupted": True,
                 })
         except Exception as e:
@@ -137,26 +167,42 @@ def extract_durable_facts(chat_dir: Path, ts: str) -> list:
     return facts
 
 
-def write_to_nmem(fact: dict, dry_run: bool = False):
+def write_to_nmem(fact: dict, dry_run: bool = False) -> bool:
     """Write a single fact to Nowledge Mem via nmem CLI."""
     title = fact["title"][:80]
     content = fact["content"]
-    src_label = "runstate" if fact.get("is_runstate") else "chat"
-    interrupted = "interrupted" if fact.get("is_interrupted") else ""
-    label = f"manicode,{src_label},{interrupted}".strip(",")
+    is_interrupted = fact.get("is_interrupted", False)
+    
+    # Determine importance based on content type
+    if is_interrupted:
+        importance = 0.9  # High priority: incomplete work needs attention
+    elif "bug" in title.lower() or "根因" in title:
+        importance = 0.8
+    else:
+        importance = 0.7
+    
+    # Determine labels
+    labels = ["manicode-sync"]
+    if "meta-pass" in fact.get("source", ""):
+        labels.append("meta-pass")
+    elif "pass-radar" in fact.get("source", ""):
+        labels.append("pass-radar")
+    if is_interrupted:
+        labels.append("incomplete")
+    
+    label_str = ",".join(labels)
     
     if dry_run:
         print(f"  Would write: {title}")
-        print(f"  Label: {label}")
         return True
     
-    # Build the nmem command
+    # Build nmem command
     cmd = [
         "nmem", "memories", "add", "--stdin",
         "--title", title,
-        "--importance", "0.7",
-        "--label", label,
-        "--source-app", "manicode"
+        "--importance", str(importance),
+        "--label", label_str,
+        "--source-app", "freebuff2nmem"
     ]
     
     try:
@@ -168,31 +214,35 @@ def write_to_nmem(fact: dict, dry_run: bool = False):
             timeout=30
         )
         if result.returncode == 0:
-            print(f"  ✓ Written: {title[:50]}...")
             return True
         else:
-            print(f"  ✗ Failed: {result.stderr[:100]}")
+            print(f"  ERROR: {result.stderr[:100]}", file=sys.stderr)
             return False
     except Exception as e:
-        print(f"  ✗ Error: {e}")
+        print(f"  ERROR: {e}", file=sys.stderr)
         return False
 
 
 def main():
     parser = argparse.ArgumentParser(description="Sync manicode chats to Nowledge Mem")
     parser.add_argument("--project", default=None, help="Project name (default: scan all)")
-    parser.add_argument("--limit", type=int, default=50, help="Max chats to process")
-    parser.add_argument("--dry-run", action="store_true", help="Show facts without writing")
     parser.add_argument("--project-path", default=None, help="Custom project path")
+    parser.add_argument("--limit", type=int, default=50, help="Max chats to process")
+    parser.add_argument("--full", action="store_true", help="Full re-sync (ignore state)")
+    parser.add_argument("--dry-run", action="store_true", help="Show facts without writing")
     args = parser.parse_args()
 
+    # Determine base path
     if args.project_path:
         base = Path(args.project_path)
+    elif args.project:
+        base = BASE_DIR / args.project
     else:
-        base = BASE_DIR / (args.project or "")
-
+        # Scan all projects
+        base = BASE_DIR
+    
     if not base.exists():
-        print(f"ERROR: Project path not found: {base}", file=sys.stderr)
+        print(f"ERROR: Path not found: {base}", file=sys.stderr)
         sys.exit(1)
 
     chats_dir = base / "chats"
@@ -200,29 +250,61 @@ def main():
         print(f"ERROR: No chats directory: {chats_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Find substantive chats
-    chat_dirs = sorted([
+    # Load sync state
+    state = load_sync_state(base)
+    synced_chats = state.get("chats", {})
+    
+    # Find all substantive chats
+    all_chats = sorted([
         d for d in chats_dir.iterdir()
         if d.is_dir() and is_substantive_chat(d)
     ])[:args.limit]
 
-    print(f"Found {len(chat_dirs)} substantive chat(s) in {base}")
+    # Determine which chats to process
+    if args.full:
+        chats_to_process = all_chats
+        print(f"Full sync: processing {len(chats_to_process)} chat(s)")
+    else:
+        # Incremental: only new or updated chats
+        chats_to_process = []
+        for chat_dir in all_chats:
+            ts = chat_dir.name
+            current_hash = get_chat_hash(chat_dir)
+            last_hash = synced_chats.get(ts, {}).get("hash")
+            
+            if current_hash != last_hash:
+                chats_to_process.append(chat_dir)
+        
+        print(f"Incremental sync: {len(chats_to_process)} new/updated chat(s) found")
+        if not chats_to_process and synced_chats:
+            print(f"Last sync: {state.get('last_sync', 'unknown')}")
+            print("All chats are up to date.")
+            return
 
+    # Process chats
     all_facts = []
-    for chat_dir in chat_dirs:
+    updated_states = {}
+    
+    for chat_dir in chats_to_process:
         ts = chat_dir.name
         print(f"\nProcessing {ts}...")
+        
+        # Update hash
+        current_hash = get_chat_hash(chat_dir)
+        updated_states[ts] = {"hash": current_hash, "timestamp": datetime.now().isoformat()}
+        
+        # Extract facts
         facts = extract_durable_facts(chat_dir, ts)
         print(f"  Found {len(facts)} fact(s)")
         all_facts.extend(facts)
 
     # Write facts
-    print(f"\n{'='*60}")
-    print(f"Total facts extracted: {len(all_facts)}")
-    
     if not all_facts:
-        print("No durable facts found.")
+        print("\nNo new durable facts found.")
         return
+    
+    print(f"\n{'='*60}")
+    print(f"Total facts to process: {len(all_facts)}")
     
     success = 0
     for i, f in enumerate(all_facts, 1):
@@ -230,10 +312,18 @@ def main():
         if write_to_nmem(f, dry_run=args.dry_run):
             success += 1
 
+    # Save sync state
+    if not args.dry_run:
+        state["chats"] = {**synced_chats, **updated_states}
+        save_sync_state(base, state)
+        print(f"\nSync state saved to {(base / SYNC_STATE_FILE).resolve()}")
+
     print(f"\n{'='*60}")
     print(f"Done. {success}/{len(all_facts)} fact(s) written.")
     if args.dry_run:
         print("(dry-run mode: no facts were actually written)")
+    else:
+        print(f"Next sync will only process new/updated chats.")
 
 
 if __name__ == "__main__":
