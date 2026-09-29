@@ -1,4 +1,4 @@
-# freebuff2nmem
+# nowledge-mem-freebuff
 
 [English](#english) | [中文](#中文)
 
@@ -6,15 +6,16 @@
 
 ## English
 
-### What is freebuff2nmem?
+### What is it?
 
-**freebuff2nmem** is a bridge that connects your AI coding sessions with persistent memory. It solves a fundamental problem: every time you start a new conversation with an AI coding assistant, it starts from scratch—forgetting previous decisions, architecture constraints, and lessons learned.
-
-This project creates a bidirectional flow between:
-- **manicode/freebuff** (your AI coding sessions)
-- **Nowledge Mem** (persistent knowledge graph)
+**nowledge-mem-freebuff** is an official-style nmem plugin package for **freebuff** (manicode/codebuff). It gives your AI coding sessions access to persistent cross-tool memory—so decisions, bug fixes, and architecture constraints survive between conversations.
 
 ### Why does this matter?
+
+freebuff doesn't have a TypeScript Extension API like Pi. This plugin works around that limitation with:
+- **5 standard skills** for in-session memory access
+- **MCP server injection** via `.agents/mcp.json`
+- **CLI sync script** for historical chat import
 
 When working on complex projects like embedded firmware (embedded device), AI-assisted development generates invaluable context:
 - Bug root causes and fixes
@@ -22,96 +23,128 @@ When working on complex projects like embedded firmware (embedded device), AI-as
 - Workflow preferences and patterns
 - Project-specific conventions
 
-Without persistence, this knowledge is lost between sessions. freebuff2nmem captures it automatically.
+Without persistence, this knowledge is lost between sessions. nowledge-mem-freebuff captures it.
 
 ### How it works
 
 ```
-┌──────────────────┐     sync      ┌──────────────────┐     inject     ┌──────────────────┐
-│  manicode        │ ─────────────► │  Nowledge Mem    │ ◄───────────── │  Your AI         │
-│  (freebuff)      │   Extract      │  (nmem)          │   MCP tools    │  sessions        │
+┌──────────────────┐     sync       ┌──────────────────┐     inject     ┌──────────────────┐
+│  manicode        │ ─────────────► │  Nowledge Mem    │ ◄───────────── │  freebuff        │
+│  (freebuff)      │   Extract      │  (nmem)          │   MCP tools    │  (session)       │
 │                  │   durable      │                  │   memory       │                  │
 │  - Chat history  │   facts        │  - Searchable    │   recall       │  - Context-aware │
 │  - Session logs  │                │    knowledge     │                │  - Learns from   │
-│                  │                │  - Durable       │                │    previous work │
 └──────────────────┘                └──────────────────┘                └──────────────────┘
+         ↑                                   │                              │
+         └──────── knowledge-mem-freebuff-sync ┘                              └─ .agents/mcp.json
+                        (manual CLI, not auto)
 ```
 
-**Two capabilities:**
+### Three capabilities
 
 | Capability | What it does | When to use |
 |---|---|---|
-| **Sync** | Extracts durable facts from chat history into persistent memories | After completing important sessions, batch processing |
-| **Inject** | Configures MCP so new sessions can query memories in real-time | New project setup, enabling memory access |
+| **Skills** | `read-working-memory`, `search-memory`, `distill-memory`, `save-thread`, `status` | In-session — agent loads these automatically via `.agents/skills/` |
+| **MCP** | Real-time nmem API access during conversation | New project setup — one `.agents/mcp.json` file |
+| **Sync** | Import historical chat sessions into Mem threads | Post-session — run CLI manually when convenient |
 
 ### Installation
 
-#### Option 1: Git Clone (Recommended)
-
-```bash
-git clone https://github.com/alexwwang/freebuff2nmem.git
-cd freebuff2nmem
-```
-
-#### Option 2: Download Release
-
-Download the latest release from [GitHub Releases](https://github.com/alexwwang/freebuff2nmem/releases) and extract.
-
 #### Prerequisites
-
-Before using freebuff2nmem, ensure you have:
 
 | Dependency | Version | Check Command |
 |---|---|---|
 | **nmem** | ≥ 1.0.0 | `nmem --version` |
-| **Python** | ≥ 3.8 | `python3 --version` |
+| **Node.js** | ≥ 18 | `node --version` |
 | **manicode/freebuff** | Latest | `freebuff --version` |
-| **curl** | Any | `curl --version` |
 
-#### Verify Installation
+#### Option 1: Clone and Install (Recommended)
 
 ```bash
-# Check nmem is running
-curl -s http://<nmem_api_url>/health
-# Expected: {"status":"ok"}
+git clone https://github.com/alexwwang/freebuff2nmem.git
+cd freebuff2nmem
 
-# Test sync tool
-python3 tools/sync_chats.py --help
+# Install into a specific project
+./install.sh ~/path/to/my-project
+```
 
-# Test install script
-./install.sh --help
+The install script will:
+1. Create `.agents/mcp.json` (if not present)
+2. Copy 5 skills to `.agents/skills/nowledge-mem/`
+3. Append Nowledge Mem section to `AGENTS.md`
+
+#### Option 2: Manual Setup
+
+```bash
+# Copy MCP config
+mkdir -p ~/.agents && cp mcp/mcp.json.example ~/.agents/mcp.json
+
+# Copy skills
+mkdir -p ~/.config/manicode/.agents/skills/nowledge-mem/{read-working-memory,search-memory,distill-memory,save-thread,status}
+for skill in read-working-memory search-memory distill-memory save-thread status; do
+  cp skills/$skill/SKILL.md ~/.config/manicode/.agents/skills/nowledge-mem/$skill/SKILL.md
+done
+
+# Copy AGENTS.md
+cp AGENTS.md ./AGENTS.md
 ```
 
 ### Quick Start
 
 ```bash
-# Sync existing chat history
-python3 tools/sync_chats.py --project <project_name>
+# 1. Enable memory for a project
+./install.sh ~/path/to/project
 
-# Enable memory for a new project
-./install.sh ~/my-project
+# 2. Restart freebuff in that project
+# (when prompted, trust the .agents/mcp.json configuration)
+
+# 3. Sync historical sessions
+knowledge-mem-freebuff-sync --project my-project --dry-run   # preview first
+knowledge-mem-freebuff-sync --project my-project --apply    # import
+
+# 4. Or sync all projects at once
+knowledge-mem-freebuff-sync --apply
+```
+
+### Sync Script Usage
+
+```bash
+# Preview what would be imported
+knowledge-mem-freebuff-sync --project <project_name> --dry-run
+
+# Import all matching sessions
+knowledge-mem-freebuff-sync --project <project_name> --apply
+
+# Import with filters
+knowledge-mem-freebuff-sync --project <project_name> --since 2026-09-01 --apply
+knowledge-mem-freebuff-sync --project <project_name> --limit 10 --apply
+
+# Machine-readable output
+knowledge-mem-freebuff-sync --json --project <project_name> --dry-run
 ```
 
 ### Key Features
 
-- **Incremental sync**: Only processes new/updated conversations (uses SHA256 hashing)
+- **Incremental sync**: Only processes new/updated conversations (uses SHA256 hashing via `.sync-state.json`)
 - **Smart extraction**: Filters out process chatter, keeps only durable facts
-- **Automatic injection**: Creates `.agents/mcp.json` and skill files
+- **Thread-based storage**: Each imported session becomes a Mem thread (not scattered memories)
+- **Deduplicated API calls**: Uses `deduplicate` mode to prevent double-imports
 - **Bilingual support**: Works with both Chinese and English content
 
 ---
 
 ## 中文
 
-### 什么是 freebuff2nmem？
+### 这是什么？
 
-**freebuff2nmem** 是连接 AI 编程会话与持久记忆的桥梁。它解决了一个核心问题：每次开启新的 AI 对话时，助手都会从零开始——遗忘之前的决策、架构约束和 learned lessons。
+**nowledge-mem-freebuff** 是面向 **freebuff**（manicode/codebuff）的 nmem 官方插件包。它让你的 AI 编程会话能够访问跨工具的持久记忆——决策、Bug 修复、架构约束都能在对话间延续。
 
-本项目在以下两者之间建立双向连接：
-- **manicode/freebuff**（你的 AI 编程会话）
-- **Nowledge Mem**（持久化知识图谱）
+### 为什么重要？
 
-### 为什么这很重要？
+freebuff 不像 Pi 那样有 TypeScript Extension API。本插件通过以下方式弥补这一限制：
+- **5 个标准 skill** 用于会话内记忆访问
+- **MCP 服务器注入** 通过 `.agents/mcp.json`
+- **CLI 同步脚本** 用于历史对话导入
 
 在处理复杂项目（如嵌入式设备时，AI 辅助开发会产生大量有价值上下文：
 - Bug 根因与修复方案
@@ -119,80 +152,111 @@ python3 tools/sync_chats.py --project <project_name>
 - 工作流偏好与模式
 - 项目特定惯例
 
-如果没有持久化机制，这些知识会在会话间丢失。freebuff2nmem 自动捕获它。
+没有持久化机制，这些知识会在会话间丢失。nowledge-mem-freebuff 自动捕获它。
 
 ### 工作原理
 
 ```
-┌──────────────────┐     同步      ┌──────────────────┐     注入      ┌──────────────────┐
-│  manicode        │ ─────────────► │  Nowledge Mem    │ ◄───────────── │  你的 AI         │
-│  (freebuff)      │   提取         │  (nmem)          │   MCP 工具     │  会话            │
-│                  │   持久事实     │                  │   记忆检索     │                  │
+┌──────────────────┐     同步       ┌──────────────────┐     注入       ┌──────────────────┐
+│  manicode        │ ─────────────► │  Nowledge Mem    │ ◄───────────── │  freebuff        │
+│  (freebuff)      │   提取          │  (nmem)          │   MCP 工具     │  （会话）        │
+│                  │   持久事实      │                  │   记忆检索     │                  │
 │  - 对话历史      │                │  - 可搜索        │                │  - 感知上下文的  │
 │  - 会话日志      │                │    知识库        │                │  - 从之前工作学习│
 └──────────────────┘                └──────────────────┘                └──────────────────┘
+         ↑                                   │                              │
+         └──────── knowledge-mem-freebuff-sync ┘                              └─ .agents/mcp.json
+                        （手动 CLI，非自动）
 ```
 
-**两大能力：**
+### 三大能力
 
 | 能力 | 作用 | 使用场景 |
 |---|---|---|
-| **同步** | 从对话历史中提取持久事实写入记忆 | 完成重要会话后、批量处理 |
-| **注入** | 配置 MCP 使新会话能实时查询记忆 | 新项目初始化、启用记忆功能 |
+| **Skills** | `read-working-memory`, `search-memory`, `distill-memory`, `save-thread`, `status` | 会话内 — 通过 `.agents/skills/` 自动加载 |
+| **MCP** | 对话中实时访问 nmem API | 新项目初始化 — 一个 `.agents/mcp.json` 文件 |
+| **Sync** | 将历史对话会话导入 Mem threads | 会话后 — 手动运行 CLI |
 
 ### 安装
 
-#### 方式一：Git 克隆（推荐）
-
-```bash
-git clone https://github.com/alexwwang/freebuff2nmem.git
-cd freebuff2nmem
-```
-
-#### 方式二：下载发布版
-
-从 [GitHub Releases](https://github.com/alexwwang/freebuff2nmem/releases) 下载最新 release 并解压。
-
 #### 前置依赖
-
-使用 freebuff2nmem 前，请确保已安装：
 
 | 依赖 | 版本要求 | 检查命令 |
 |---|---|---|
 | **nmem** | ≥ 1.0.0 | `nmem --version` |
-| **Python** | ≥ 3.8 | `python3 --version` |
+| **Node.js** | ≥ 18 | `node --version` |
 | **manicode/freebuff** | 最新稳定版 | `freebuff --version` |
-| **curl** | 任意版本 | `curl --version` |
 
-#### 验证安装
+#### 方式一：克隆并安装（推荐）
 
 ```bash
-# 检查 nmem 是否运行
-curl -s http://<nmem_api_url>/health
-# 应返回: {"status":"ok"}
+git clone https://github.com/alexwwang/freebuff2nmem.git
+cd freebuff2nmem
 
-# 测试同步工具
-python3 tools/sync_chats.py --help
+# 安装到指定项目
+./install.sh ~/path/to/my-project
+```
 
-# 测试安装脚本
-./install.sh --help
+安装脚本会：
+1. 创建 `.agents/mcp.json`（如不存在）
+2. 复制 5 个 skills 到 `.agents/skills/nowledge-mem/`
+3. 向 `AGENTS.md` 追加 Nowledge Mem 章节
+
+#### 方式二：手动配置
+
+```bash
+# 复制 MCP 配置
+mkdir -p ~/.agents && cp mcp/mcp.json.example ~/.agents/mcp.json
+
+# 复制 skills
+mkdir -p ~/.config/manicode/.agents/skills/nowledge-mem/{read-working-memory,search-memory,distill-memory,save-thread,status}
+for skill in read-working-memory search-memory distill-memory save-thread status; do
+  cp skills/$skill/SKILL.md ~/.config/manicode/.agents/skills/nowledge-mem/$skill/SKILL.md
+done
+
+# 复制 AGENTS.md
+cp AGENTS.md ./AGENTS.md
 ```
 
 ### 快速开始
 
 ```bash
-# 同步现有对话历史
-python3 tools/sync_chats.py --project <project_name>
+# 1. 为新项目启用记忆
+./install.sh ~/path/to/project
 
-# 为新项目启用记忆功能
-./install.sh ~/my-project
+# 2. 重启 freebuff（提示信任 .agents/mcp.json 时确认）
+
+# 3. 同步历史会话
+knowledge-mem-freebuff-sync --project my-project --dry-run   # 先预览
+knowledge-mem-freebuff-sync --project my-project --apply    # 再导入
+
+# 4. 或一次性同步所有项目
+knowledge-mem-freebuff-sync --apply
+```
+
+### Sync 脚本用法
+
+```bash
+# 预览要导入的内容
+knowledge-mem-freebuff-sync --project <project_name> --dry-run
+
+# 导入所有匹配会话
+knowledge-mem-freebuff-sync --project <project_name> --apply
+
+# 带过滤条件导入
+knowledge-mem-freebuff-sync --project <project_name> --since 2026-09-01 --apply
+knowledge-mem-freebuff-sync --project <project_name> --limit 10 --apply
+
+# 机器可读输出
+knowledge-mem-freebuff-sync --json --project <project_name> --dry-run
 ```
 
 ### 核心特性
 
-- **增量同步**：只处理新增或更新的对话（使用 SHA256 哈希比对）
+- **增量同步**：只处理新增或更新的对话（使用 SHA256 哈希 + `.sync-state.json`）
 - **智能提取**：过滤过程性闲聊，只保留持久事实
-- **自动注入**：创建 `.agents/mcp.json` 和技能文件
+- **Thread 存储**：每个导入会话成为 Mem thread（而非散乱的记忆）
+- **幂等 API 调用**：使用 `deduplicate` 模式防止重复导入
 - **双语支持**：兼容中英文内容
 
 ---
@@ -200,24 +264,34 @@ python3 tools/sync_chats.py --project <project_name>
 ## Repository Structure
 
 ```
-freebuff2nmem/
-├── SKILL.md                 # Main skill entry point
-├── README.md               # This file
-├── AGENTS.md               # Agent routing guide
-├── install.sh              # One-command setup script
+nowledge-mem-freebuff/
+├── package.json              # Plugin manifest (keywords: freebuff-plugin, manicode-plugin)
+├── AGENTS.md                 # Usage guide for agents
+├── README.md                 # This file
+├── install.sh                # One-command project setup
 ├── .gitignore
-├── skills/
-│   ├── sync-manicode/       # Sync skill (manicode → nmem)
-│   │   └── SKILL.md
-│   └── nowledge-mem-inject/ # Inject skill (nmem → session)
-│       └── SKILL.md
-├── tools/
-│   └── sync_chats.py        # Python sync tool
-├── mcp/
-│   └── mcp.json.example     # MCP config template
-└── docs/
-    └── architecture.md      # Architecture documentation
+├── scripts/
+│   └── sync-history.mjs      # Historical chat sync CLI
+├── skills/                   # 5 standard nmem skills
+│   ├── read-working-memory/
+│   ├── search-memory/
+│   ├── distill-memory/
+│   ├── save-thread/
+│   └── status/
+└── mcp/
+    └── mcp.json.example      # MCP config template
 ```
+
+## Comparison with Pi Plugin
+
+| Feature | nknowledge-mem-pi | nknowledge-mem-freebuff |
+|---|---|---|
+| Extension API | ✅ TypeScript lifecycle hooks | ❌ Not supported by freebuff |
+| Auto-sync on completion | ✅ Extension hook triggers | ❌ Manual CLI (`sync-history.mjs`) |
+| Skills | ✅ 5 skills | ✅ 5 skills |
+| Sync script | ✅ Built-in | ✅ Available |
+| MCP access | ✅ Via extension | ✅ Via `.agents/mcp.json` |
+| Keyword | `pi-package` | `freebuff-plugin`, `manicode-plugin` |
 
 ## License
 
