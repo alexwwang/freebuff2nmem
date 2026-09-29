@@ -44,6 +44,44 @@ Without persistence, this knowledge is lost between sessions. freebuff2nmem capt
 | **Sync** | Extracts durable facts from chat history into persistent memories | After completing important sessions, batch processing |
 | **Inject** | Configures MCP so new sessions can query memories in real-time | New project setup, enabling memory access |
 
+### Installation
+
+#### Option 1: Git Clone (Recommended)
+
+```bash
+git clone https://github.com/alexwwang/freebuff2nmem.git
+cd freebuff2nmem
+```
+
+#### Option 2: Download Release
+
+Download the latest release from [GitHub Releases](https://github.com/alexwwang/freebuff2nmem/releases) and extract.
+
+#### Prerequisites
+
+Before using freebuff2nmem, ensure you have:
+
+| Dependency | Version | Check Command |
+|---|---|---|
+| **nmem** | ≥ 1.0.0 | `nmem --version` |
+| **Python** | ≥ 3.8 | `python3 --version` |
+| **manicode/freebuff** | Latest | `freebuff --version` |
+| **curl** | Any | `curl --version` |
+
+#### Verify Installation
+
+```bash
+# Check nmem is running
+curl -s http://<nmem_api_url>/health
+# Expected: {"status":"ok"}
+
+# Test sync tool
+python3 tools/sync_chats.py --help
+
+# Test install script
+./install.sh --help
+```
+
 ### Quick Start
 
 ```bash
@@ -60,26 +98,6 @@ python3 tools/sync_chats.py --project <project_name>
 - **Smart extraction**: Filters out process chatter, keeps only durable facts
 - **Automatic injection**: Creates `.agents/mcp.json` and skill files
 - **Bilingual support**: Works with both Chinese and English content
-
-### Installation
-
-```bash
-# Clone the project
-git clone https://github.com/alexwwang/freebuff2nmem.git
-cd freebuff2nmem
-
-# Install dependencies
-# - nmem (Nowledge Mem CLI)
-# - Python 3.8+
-# - manicode/freebuff
-```
-
-### Requirements
-
-- **manicode/freebuff**: Latest stable version
-- **Nowledge Mem**: ≥ 1.0.0 (running on `<nmem_api_url>`)
-- **Python**: ≥ 3.8
-- **curl**: For health checks
 
 ---
 
@@ -122,6 +140,44 @@ cd freebuff2nmem
 | **同步** | 从对话历史中提取持久事实写入记忆 | 完成重要会话后、批量处理 |
 | **注入** | 配置 MCP 使新会话能实时查询记忆 | 新项目初始化、启用记忆功能 |
 
+### 安装
+
+#### 方式一：Git 克隆（推荐）
+
+```bash
+git clone https://github.com/alexwwang/freebuff2nmem.git
+cd freebuff2nmem
+```
+
+#### 方式二：下载发布版
+
+从 [GitHub Releases](https://github.com/alexwwang/freebuff2nmem/releases) 下载最新 release 并解压。
+
+#### 前置依赖
+
+使用 freebuff2nmem 前，请确保已安装：
+
+| 依赖 | 版本要求 | 检查命令 |
+|---|---|---|
+| **nmem** | ≥ 1.0.0 | `nmem --version` |
+| **Python** | ≥ 3.8 | `python3 --version` |
+| **manicode/freebuff** | 最新稳定版 | `freebuff --version` |
+| **curl** | 任意版本 | `curl --version` |
+
+#### 验证安装
+
+```bash
+# 检查 nmem 是否运行
+curl -s http://<nmem_api_url>/health
+# 应返回: {"status":"ok"}
+
+# 测试同步工具
+python3 tools/sync_chats.py --help
+
+# 测试安装脚本
+./install.sh --help
+```
+
 ### 快速开始
 
 ```bash
@@ -138,26 +194,6 @@ python3 tools/sync_chats.py --project <project_name>
 - **智能提取**：过滤过程性闲聊，只保留持久事实
 - **自动注入**：创建 `.agents/mcp.json` 和技能文件
 - **双语支持**：兼容中英文内容
-
-### 安装
-
-```bash
-# 克隆项目
-git clone https://github.com/alexwwang/freebuff2nmem.git
-cd freebuff2nmem
-
-# 安装依赖
-# - nmem（Nowledge Mem CLI）
-# - Python 3.8+
-# - manicode/freebuff
-```
-
-### 依赖要求
-
-- **manicode/freebuff**：最新稳定版
-- **Nowledge Mem**：≥ 1.0.0（运行在 `<nmem_api_url>`）
-- **Python**：≥ 3.8
-- **curl**：用于健康检查
 
 ---
 
