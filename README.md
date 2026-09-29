@@ -17,7 +17,7 @@ freebuff doesn't have a TypeScript Extension API like Pi. This package works aro
 - **MCP server injection** via `.agents/mcp.json`
 - **CLI sync script** for historical chat import
 
-When working on complex projects like embedded firmware (embedded device), AI-assisted development generates invaluable context:
+AI-assisted development generates invaluable context during complex projects:
 - Bug root causes and fixes
 - Architecture decisions and constraints  
 - Workflow preferences and patterns
@@ -146,7 +146,7 @@ freebuff 不像 Pi 那样有 TypeScript Extension API。本包通过以下方式
 - **MCP 服务器注入** 通过 `.agents/mcp.json`
 - **CLI 同步脚本** 用于历史对话导入
 
-在处理复杂项目（如嵌入式设备时，AI 辅助开发会产生大量有价值上下文：
+AI 辅助开发在处理复杂项目时会产生大量有价值上下文：
 - Bug 根因与修复方案
 - 架构决策与约束
 - 工作流偏好与模式
