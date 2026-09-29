@@ -1,0 +1,26 @@
+{
+  "name": "nowledge-mem-freebuff",
+  "version": "0.1.0",
+  "description": "Cross-tool memory for freebuff (manicode/codebuff). Recall past decisions, search knowledge from every AI tool, and save what matters.",
+  "keywords": ["freebuff-plugin", "manicode-plugin", "codebuff-plugin", "memory", "knowledge"],
+  "author": "Nowledge Labs (adapted by alexwwang)",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nowledge-mem-freebuff-sync": "./scripts/sync-history.mjs"
+  },
+  "freebuff": {
+    "skills": ["./skills"]
+  },
+  "files": [
+    "skills/",
+    "scripts/",
+    "AGENTS.md",
+    "README.md",
+    "mcp/",
+    "install.sh"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

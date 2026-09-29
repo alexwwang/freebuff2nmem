@@ -1,10 +1,7 @@
 {
-  "_comment": "Copy this to .agents/mcp.json in your project root",
-  "_note": "freebuff reads this automatically when starting a session in this directory",
   "mcpServers": {
     "nowledge-mem": {
-      "url": "http://127.0.0.1:14242/mcp",
-      "_note": "nmem MCP endpoint. Requires nmem server running."
+      "url": "http://127.0.0.1:14242/mcp"
     }
   }
 }

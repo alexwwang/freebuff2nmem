@@ -1,13 +1,5 @@
-# Generated configs (copy from .example before use)
-.agents/mcp.json
-.agents/skills/*/SKILL.md
-AGENTS.md
-AGENTS.zh_CN.md
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Session data (already synced to nmem)
-sessions/
-.sync-state.json
+node_modules/
+.git/
+*.log
+.env
+.DS_Store
